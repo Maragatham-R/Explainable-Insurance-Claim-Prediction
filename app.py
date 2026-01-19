@@ -4,6 +4,7 @@ import pandas as pd
 import joblib
 import shap
 import matplotlib.pyplot as plt
+import numpy as np
 
 # --------------------------
 # Page config
@@ -13,13 +14,10 @@ st.set_page_config(
     layout="wide"
 )
 
-# --------------------------
-# Title
-# --------------------------
 st.title("🛡️ Explainable Insurance Claim Prediction")
 st.write(
-    "Predict the likelihood of an insurance claim and understand the decision "
-    "using SHAP-based explainability."
+    "This application predicts insurance claim likelihood and explains "
+    "the prediction using SHAP-based feature contributions."
 )
 
 # --------------------------
@@ -45,7 +43,7 @@ charges = st.sidebar.number_input("Medical Charges", 100.0, 100000.0, 5000.0)
 predict_btn = st.sidebar.button("🔍 Predict Claim")
 
 # --------------------------
-# Main Panel – Prediction & SHAP
+# Main Panel – Prediction & Explanation
 # --------------------------
 if predict_btn:
     # Encoding (same as training)
@@ -78,42 +76,61 @@ if predict_btn:
         st.success(f"✅ Claim Not Likely (Probability: {probability:.2f})")
 
     # --------------------------
-    # SHAP Explanation (FIXED & VISIBLE)
+    # SHAP Explanation → PIE CHART
     # --------------------------
-    st.subheader("🔎 Model Explanation (SHAP)")
+    st.subheader("🔎 Explanation of Prediction")
 
     explainer = shap.TreeExplainer(model)
     shap_values = explainer.shap_values(user_input)
 
-    # For binary classification → focus on positive class
+    # Binary classification → use positive class
     if isinstance(shap_values, list):
-        shap_vals = shap_values[1]
+        shap_vals = shap_values[1][0]
     else:
-        shap_vals = shap_values
+        shap_vals = shap_values[0]
 
-    # IMPORTANT: Clear previous plots
-    plt.clf()
+    # Convert SHAP values to absolute contributions
+    feature_names = user_input.columns
+    shap_abs = np.abs(shap_vals)
 
-    # SHAP bar plot (journal-safe)
-    shap.summary_plot(
-        shap_vals,
-        user_input,
-        plot_type="bar",
-        max_display=7,
-        show=False
-    )
+    shap_df = pd.DataFrame({
+        "Feature": feature_names,
+        "Contribution": shap_abs
+    })
 
-    # Display the SHAP figure
-    st.pyplot(plt.gcf())
+    # Take top features only
+    shap_df = shap_df.sort_values(
+        by="Contribution", ascending=False
+    ).head(5)
+
+    # Normalize to percentages
+    shap_df["Contribution (%)"] = (
+        shap_df["Contribution"] / shap_df["Contribution"].sum()
+    ) * 100
 
     # --------------------------
-    # Plain-English Explanation
+    # Pie Chart
+    # --------------------------
+    fig, ax = plt.subplots(figsize=(6, 6))
+    ax.pie(
+        shap_df["Contribution (%)"],
+        labels=shap_df["Feature"],
+        autopct="%1.1f%%",
+        startangle=90
+    )
+    ax.set_title("Feature Contribution to Prediction")
+
+    st.pyplot(fig)
+
+    # --------------------------
+    # Simple Explanation Text
     # --------------------------
     st.markdown(
         """
-        **How to read this chart:**
-        - The bar chart represents **mean absolute SHAP values**
-        - Higher values indicate stronger influence on the prediction
-        - For this case, **age and sex** contribute most to the claim decision
+        **How to interpret this chart:**
+        - The pie chart shows the **relative contribution** of each feature
+          to the model’s decision.
+        - Larger slices indicate stronger influence on the insurance claim prediction.
+        - This visualization is derived from **SHAP values**, ensuring faithful explainability.
         """
     )

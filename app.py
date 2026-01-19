@@ -80,4 +80,4 @@ if submit:
           plot_type="bar",
           show=False
        )
-st.pyplot(fig)
+    st.pyplot(fig)

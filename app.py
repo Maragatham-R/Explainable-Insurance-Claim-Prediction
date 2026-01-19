@@ -50,30 +50,40 @@ if st.sidebar.button("Predict Claim"):
     explainer = shap.TreeExplainer(model)
     shap_values = explainer.shap_values(user_input)
 
-    # ---- Handle classifier output ----
+    # --- Handle classifier output ---
     if isinstance(shap_values, list):
-        shap_vals = shap_values[1][0]   # class 1, first row
+        shap_vals = shap_values[1][0]
     else:
         shap_vals = shap_values[0]
 
-    shap_vals = shap_vals.flatten()
+    shap_vals = np.array(shap_vals).flatten()
 
-    # ---- USE MODEL FEATURE NAMES (NOT user_input.columns) ----
-    feature_names = model.feature_names_in_
+    # --- Feature names from model ---
+    if hasattr(model, "feature_names_in_"):
+        feature_names = list(model.feature_names_in_)
+    else:
+        feature_names = [f"Feature {i}" for i in range(len(shap_vals))]
 
-    # ---- SAFETY CHECK ----
-    
+    # --- FORCE SAME LENGTH ---
+    min_len = min(len(feature_names), len(shap_vals))
+    shap_vals = shap_vals[:min_len]
+    feature_names = feature_names[:min_len]
 
-# ---- SORT ----
-    sorted_idx = np.argsort(np.abs(shap_vals))
+    # --- SORT BY IMPORTANCE ---
+    order = np.argsort(np.abs(shap_vals))
 
-    fig, ax = plt.subplots(figsize=(9, 6))
+    # --- REDUCE INDEX RANGE (TOP K FEATURES ONLY) ---
+    TOP_K = min(10, len(order))   # <- THIS PREVENTS OUT OF RANGE
+    order = order[-TOP_K:]
+
+    # --- PLOT ---
+    fig, ax = plt.subplots(figsize=(9, 5))
     ax.barh(
-        np.array(feature_names)[sorted_idx],
-        shap_vals[sorted_idx]
+        np.array(feature_names)[order],
+        shap_vals[order]
     )
 
     ax.set_xlabel("SHAP value (impact on prediction)")
-    ax.set_title("Feature Impact on Insurance Claim Prediction")
+    ax.set_title("Top Feature Contributions")
 
     st.pyplot(fig)

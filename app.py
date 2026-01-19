@@ -49,25 +49,17 @@ if st.sidebar.button("Predict Claim"):
     explainer = shap.TreeExplainer(model)
     shap_values = explainer.shap_values(user_input)
 
-    # ---- HANDLE BOTH SHAP OUTPUT TYPES ----
+    # Handle binary vs single-output models
     if isinstance(shap_values, list):
-        # Binary classifier (list of arrays)
-        shap_vals = shap_values[1][0]
-        base_value = explainer.expected_value[1]
+        shap_vals = shap_values[1]
     else:
-        # Single-output model
-        shap_vals = shap_values[0]
-        base_value = explainer.expected_value
+        shap_vals = shap_values
 
-    # ---- WATERFALL PLOT ----
     fig = plt.figure()
-    shap.waterfall_plot(
-        shap.Explanation(
-            values=shap_vals,
-            base_values=base_value,
-            data=user_input.iloc[0],
-            feature_names=user_input.columns,
-        ),
+    shap.summary_plot(
+        shap_vals,
+        user_input,
+        plot_type="bar",
         show=False
     )
     st.pyplot(fig)

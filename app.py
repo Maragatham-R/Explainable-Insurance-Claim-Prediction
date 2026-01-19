@@ -5,9 +5,9 @@ import shap
 import matplotlib.pyplot as plt
 import joblib
 
-# ------------------------------------------------
+# --------------------------
 # PAGE CONFIG
-# ------------------------------------------------
+# --------------------------
 st.set_page_config(
     page_title="Explainable Insurance Claim Prediction",
     layout="wide"
@@ -15,16 +15,26 @@ st.set_page_config(
 
 st.title("🛡️ Explainable Insurance Claim Prediction")
 
-# ------------------------------------------------
+# --------------------------
 # LOAD MODEL
-# ------------------------------------------------
+# --------------------------
 model = joblib.load("insurance.pkl")
 model_features = model.feature_names_in_
 
-# ------------------------------------------------
+# --------------------------
+# SESSION STATE INIT
+# --------------------------
+if "user_input" not in st.session_state:
+    st.session_state.user_input = None
+if "prediction" not in st.session_state:
+    st.session_state.prediction = None
+if "probability" not in st.session_state:
+    st.session_state.probability = None
+
+# --------------------------
 # SIDEBAR INPUTS
-# ------------------------------------------------
-st.sidebar.header("User Input Parameters")
+# --------------------------
+st.sidebar.header("User Inputs")
 
 age = st.sidebar.slider("Age", 18, 100, 30)
 sex = st.sidebar.selectbox("Gender", ["female", "male"])
@@ -36,69 +46,63 @@ region = st.sidebar.selectbox(
 )
 charges = st.sidebar.number_input("Charges", 100.0, 100000.0, 5000.0)
 
-# ------------------------------------------------
-# BUILD INPUT VECTOR (MATCH TRAINING SPACE)
-# ------------------------------------------------
-user_input = pd.DataFrame(
-    np.zeros((1, len(model_features))),
-    columns=model_features
-)
+# --------------------------
+# BUILD FEATURE VECTOR (MATCH MODEL)
+# --------------------------
+user_input = pd.DataFrame(np.zeros((1, len(model_features))), columns=model_features)
 
 # Numeric features
-for col, val in {
-    "age": age,
-    "bmi": bmi,
-    "children": children,
-    "charges": charges
-}.items():
+for col, val in {"age": age, "bmi": bmi, "children": children, "charges": charges}.items():
     if col in user_input.columns:
         user_input[col] = val
 
-# Categorical features (ONLY IF COLUMN EXISTS)
+# Categorical features (only if exist)
 if f"sex_{sex}" in user_input.columns:
     user_input[f"sex_{sex}"] = 1
-
 if f"smoker_{smoker}" in user_input.columns:
     user_input[f"smoker_{smoker}"] = 1
-
 if f"region_{region}" in user_input.columns:
     user_input[f"region_{region}"] = 1
 
-# ------------------------------------------------
-# PREDICTION
-# ------------------------------------------------
+# --------------------------
+# PREDICTION BUTTON
+# --------------------------
 if st.sidebar.button("🔍 Predict Claim"):
+    st.session_state.user_input = user_input
+    st.session_state.prediction = model.predict(user_input)[0]
+    st.session_state.probability = model.predict_proba(user_input)[0][1]
 
-    prediction = model.predict(user_input)[0]
-    probability = model.predict_proba(user_input)[0][1]
-
-    if prediction == 1:
-        st.error(f"⚠️ Claim Likely (Probability: {probability:.2f})")
+# --------------------------
+# SHOW PREDICTION
+# --------------------------
+if st.session_state.user_input is not None:
+    if st.session_state.prediction == 1:
+        st.error(f"⚠️ Claim Likely (Probability: {st.session_state.probability:.2f})")
     else:
-        st.success(f"✅ Claim Not Likely (Probability: {probability:.2f})")
+        st.success(f"✅ Claim Not Likely (Probability: {st.session_state.probability:.2f})")
 
-    # ------------------------------------------------
-    # SHAP EXPLANATION
-    # ------------------------------------------------
+    # --------------------------
+    # SHOW SHAP BUTTON
+    # --------------------------
     if st.button("📊 Show SHAP Explanation"):
 
         st.subheader("🔎 SHAP Feature Contribution")
 
         explainer = shap.TreeExplainer(model)
-        shap_values = explainer.shap_values(user_input)
+        shap_values = explainer.shap_values(st.session_state.user_input)
 
         if isinstance(shap_values, list):
-            shap_vals = shap_values[1][0]
+            shap_vals = shap_values[1][0] if st.session_state.prediction == 1 else shap_values[0][0]
         else:
             shap_vals = shap_values[0]
 
         shap_vals = np.abs(shap_vals).flatten()
 
-        shap_df = pd.DataFrame({
-            "Feature": model_features,
-            "Impact": shap_vals
-        }).sort_values(by="Impact", ascending=True).tail(10)
+        # Build DataFrame
+        shap_df = pd.DataFrame({"Feature": model_features, "Impact": shap_vals})
+        shap_df = shap_df.sort_values(by="Impact", ascending=True).tail(10)
 
+        # Bar plot
         fig, ax = plt.subplots(figsize=(8, 5))
         ax.barh(shap_df["Feature"], shap_df["Impact"])
         ax.set_xlabel("Mean |SHAP Value|")
@@ -107,6 +111,6 @@ if st.sidebar.button("🔍 Predict Claim"):
         st.pyplot(fig)
 
         st.info(
-            "SHAP values represent the contribution of each feature "
-            "to the predicted insurance claim outcome."
+            "The bar chart shows the magnitude of each feature's contribution "
+            "to the prediction."
         )

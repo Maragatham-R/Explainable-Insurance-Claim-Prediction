@@ -121,7 +121,7 @@ fig = shap.force_plot(
 # Display in Streamlit
 st.pyplot(fig, bbox_inches='tight')
 
-    st.pyplot(fig, bbox_inches="tight")
+st.pyplot(fig, bbox_inches="tight")
 
     # ---------------------------
     # Simple Explanation Text

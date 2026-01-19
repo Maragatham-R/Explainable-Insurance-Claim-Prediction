@@ -68,16 +68,41 @@ if submit:
     # --------------------------
     # SHAP Explanation (STABLE)
     # --------------------------
+  
     st.subheader("🔎 Explanation of Prediction")
 
     explainer = shap.TreeExplainer(model)
     shap_values = explainer.shap_values(user_input)
 
     fig, ax = plt.subplots()
-    shap.summary_plot(
-          shap_values[1],       # class 1 = claim
+
+    # If SHAP returns list (binary classification)
+    if isinstance(shap_values, list):
+       if prediction == 1:
+          # Explain WHY claim
+          shap.summary_plot(
+              shap_values[1],
+              user_input,
+              plot_type="bar",
+              show=False
+        )
+       else:
+          # Explain WHY NOT claim
+          shap.summary_plot(
+              shap_values[0],
+              user_input,
+              plot_type="bar",
+              show=False
+        )
+
+    # If SHAP returns single array
+    else:
+      shap.summary_plot(
+          shap_values,
           user_input,
           plot_type="bar",
           show=False
-       )
-    st.pyplot(fig)
+      )
+
+   st.pyplot(fig)
+

@@ -66,43 +66,39 @@ if submit:
         st.success(f"✅ Claim Not Likely (Probability: {probability:.2f})")
 
     # --------------------------
-    # SHAP Explanation (STABLE)
+    # SHAP Explanation (VISIBLE FIX)
     # --------------------------
-  
     st.subheader("🔎 Explanation of Prediction")
 
     explainer = shap.TreeExplainer(model)
     shap_values = explainer.shap_values(user_input)
 
-    fig, ax = plt.subplots()
+    # Clear previous figures
+    plt.clf()
 
-    # If SHAP returns list (binary classification)
+    # Handle both SHAP output formats
     if isinstance(shap_values, list):
-       if prediction == 1:
-          # Explain WHY claim
-          shap.summary_plot(
-              shap_values[1],
-              user_input,
-              plot_type="bar",
-              show=False
-        )
-       else:
-          # Explain WHY NOT claim
-          shap.summary_plot(
-              shap_values[0],
-              user_input,
-              plot_type="bar",
-              show=False
-        )
-
-    # If SHAP returns single array
+        if prediction == 1:
+            shap.summary_plot(
+                shap_values[1],
+                user_input,
+                plot_type="bar",
+                show=False
+            )
+        else:
+            shap.summary_plot(
+                shap_values[0],
+                user_input,
+                plot_type="bar",
+                show=False
+            )
     else:
-      shap.summary_plot(
-          shap_values,
-          user_input,
-          plot_type="bar",
-          show=False
-      )
+        shap.summary_plot(
+            shap_values,
+            user_input,
+            plot_type="bar",
+            show=False
+        )
 
-    st.pyplot(fig)
-
+# IMPORTANT: show the CURRENT figure, not a new one
+    st.pyplot(plt.gcf())

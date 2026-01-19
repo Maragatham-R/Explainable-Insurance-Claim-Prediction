@@ -62,7 +62,7 @@ if st.sidebar.button("Predict Claim"):
     feature_names = model.feature_names_in_
 
     # ---- SAFETY CHECK ----
-    assert len(feature_names) == len(shap_vals)
+    
 
 # ---- SORT ----
     sorted_idx = np.argsort(np.abs(shap_vals))

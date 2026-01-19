@@ -69,7 +69,7 @@ else:
 st.subheader("🔎 Model Explanation (SHAP Bar Plot)")
 
 # Create explainer with background data
-explainer = shap.TreeExplainer(model, X_background)
+explainer = shap.TreeExplainer(model)
 
 # Compute SHAP values
 shap_values = explainer.shap_values(user_input)

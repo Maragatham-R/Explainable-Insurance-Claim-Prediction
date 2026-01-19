@@ -22,6 +22,12 @@ st.write("Prediction with SHAP-based feature contribution")
 model = joblib.load("insurance.pkl")
 
 # --------------------------
+# SESSION STATE INIT
+# --------------------------
+if "predicted" not in st.session_state:
+    st.session_state.predicted = False
+
+# --------------------------
 # SIDEBAR INPUTS
 # --------------------------
 st.sidebar.header("User Input Parameters")
@@ -52,44 +58,53 @@ user_input = pd.DataFrame(
 )
 
 # --------------------------
-# PREDICTION BUTTON
+# PREDICT BUTTON
 # --------------------------
 if st.sidebar.button("🔍 Predict Claim"):
+    st.session_state.predicted = True
 
-    prediction = model.predict(user_input)[0]
-    probability = model.predict_proba(user_input)[0][1]
+    st.session_state.prediction = model.predict(user_input)[0]
+    st.session_state.probability = model.predict_proba(user_input)[0][1]
+    st.session_state.user_input = user_input
 
-    if prediction == 1:
-        st.error(f"⚠️ Claim Likely (Probability: {probability:.2f})")
+# --------------------------
+# SHOW PREDICTION
+# --------------------------
+if st.session_state.predicted:
+
+    if st.session_state.prediction == 1:
+        st.error(
+            f"⚠️ Claim Likely (Probability: {st.session_state.probability:.2f})"
+        )
     else:
-        st.success(f"✅ Claim Not Likely (Probability: {probability:.2f})")
+        st.success(
+            f"✅ Claim Not Likely (Probability: {st.session_state.probability:.2f})"
+        )
 
     # --------------------------
-    # SHAP EXPLANATION BUTTON
+    # SHAP BUTTON (NOW WORKS)
     # --------------------------
     if st.button("📊 Show SHAP Explanation"):
 
         st.subheader("🔎 Model Explanation (SHAP Bar Chart)")
 
-        # SHAP explainer (NO background mentioned)
         explainer = shap.TreeExplainer(model)
-        shap_values = explainer.shap_values(user_input)
+        shap_values = explainer.shap_values(st.session_state.user_input)
 
-        # Handle binary classification
         if isinstance(shap_values, list):
-            shap_vals = shap_values[1][0] if prediction == 1 else shap_values[0][0]
+            shap_vals = (
+                shap_values[1][0]
+                if st.session_state.prediction == 1
+                else shap_values[0][0]
+            )
         else:
             shap_vals = shap_values[0]
 
-        # Convert to DataFrame (1D FIX)
         shap_df = pd.DataFrame({
-            "Feature": user_input.columns,
+            "Feature": st.session_state.user_input.columns,
             "Impact": np.abs(shap_vals)
         }).sort_values(by="Impact", ascending=True)
 
-        # --------------------------
-        # BAR PLOT (STREAMLIT SAFE)
-        # --------------------------
         fig, ax = plt.subplots(figsize=(8, 5))
         ax.barh(shap_df["Feature"], shap_df["Impact"])
         ax.set_xlabel("Feature Impact on Prediction")
@@ -98,6 +113,6 @@ if st.sidebar.button("🔍 Predict Claim"):
         st.pyplot(fig)
 
         st.info(
-            "The bar chart shows the magnitude of each feature's contribution "
-            "to the individual prediction using SHAP values."
+            "The bar chart illustrates the relative contribution of each "
+            "input feature to the model’s prediction using SHAP values."
         )

@@ -104,5 +104,5 @@ if submit:
           show=False
       )
 
-   st.pyplot(fig)
+    st.pyplot(fig)
 

@@ -70,14 +70,14 @@ if submit:
     # --------------------------
     st.subheader("🔎 Explanation of Prediction")
 
-explainer = shap.TreeExplainer(model)
-shap_values = explainer.shap_values(user_input)
+    explainer = shap.TreeExplainer(model)
+    shap_values = explainer.shap_values(user_input)
 
-fig, ax = plt.subplots()
-shap.summary_plot(
-    shap_values[1],       # class 1 = claim
-    user_input,
-    plot_type="bar",
-    show=False
-)
+    fig, ax = plt.subplots()
+     shap.summary_plot(
+          shap_values[1],       # class 1 = claim
+          user_input,
+          plot_type="bar",
+          show=False
+       )
 st.pyplot(fig)

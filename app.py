@@ -99,12 +99,10 @@ if st.button("🔍 Predict Claim"):
 
     shap_values = explainer.shap_values(user_input)
 
-   fig = shap.force_plot(
-    explainer.expected_value[1],
+   fig = shap.force_plot(explainer.expected_value[1],
     shap_values[1],
     user_input,
-    matplotlib=True
-)
+    matplotlib=True)
     st.pyplot(fig, bbox_inches="tight")
 
     # ---------------------------

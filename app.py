@@ -3,6 +3,7 @@ import pandas as pd
 import shap
 import joblib
 import matplotlib.pyplot as plt
+import numpy as np
 
 st.set_page_config(
     page_title="Explainable Insurance Claim Prediction",
@@ -49,16 +50,28 @@ if st.sidebar.button("Predict Claim"):
     explainer = shap.TreeExplainer(model)
     shap_values = explainer.shap_values(user_input)
 
-    # --- HANDLE SHAP OUTPUT SAFELY ---
+    # ---- FIX SHAPE PROPERLY ----
     if isinstance(shap_values, list):
-        shap_vals = shap_values[1][0]   # <-- IMPORTANT: [0]
+        # Binary classifier → take class 1 and first row
+        shap_vals = shap_values[1][0]
     else:
-        shap_vals = shap_values[0]      # <-- IMPORTANT: [0]
+        # Single-output model → take first row
+        shap_vals = shap_values[0]
 
-    # --- CREATE BAR PLOT ---
+    # ---- ENSURE 1D ARRAY ----
+    shap_vals = shap_vals.flatten()
+
+    # ---- SORT FOR BETTER VISUAL ----
+    feature_names = user_input.columns
+    sorted_idx = np.argsort(np.abs(shap_vals))
+
     fig, ax = plt.subplots(figsize=(8, 5))
-    ax.barh(user_input.columns, shap_vals)
-    ax.set_xlabel("SHAP value (impact on model output)")
-    ax.set_title("Feature Impact on Prediction")
+    ax.barh(
+        feature_names[sorted_idx],
+        shap_vals[sorted_idx]
+    )
+    ax.set_xlabel("SHAP value (impact on prediction)")
+    ax.set_title("Feature Impact on Insurance Claim Prediction")
 
     st.pyplot(fig)
+

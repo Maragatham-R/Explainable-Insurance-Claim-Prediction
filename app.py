@@ -4,25 +4,16 @@ import shap
 import joblib
 import matplotlib.pyplot as plt
 
-# -----------------------------
-# PAGE CONFIG
-# -----------------------------
 st.set_page_config(
     page_title="Explainable Insurance Claim Prediction",
     layout="wide"
 )
 
-st.title("🛡️ Explainable Insurance Claim Prediction")
+st.title("Explainable Insurance Claim Prediction")
 st.write("Predict insurance claims and understand feature impact using SHAP")
 
-# -----------------------------
-# LOAD MODEL
-# -----------------------------
 model = joblib.load("insurance.pkl")
 
-# -----------------------------
-# SIDEBAR INPUTS
-# -----------------------------
 st.sidebar.header("User Input Parameters")
 
 age = st.sidebar.slider("Age", 18, 100, 30)
@@ -35,9 +26,39 @@ region = st.sidebar.selectbox(
 )
 charges = st.sidebar.number_input("Charges", 100.0, 100000.0, 5000.0)
 
-# -----------------------------
-# ENCODE CATEGORICALS
-# -----------------------------
 sex_val = 0 if sex == "Female" else 1
 smoker_val = 0 if smoker == "No" else 1
-region_map = {"Southwest": 0, "Southeast": 1,_
+region_map = {"Southwest": 0, "Southeast": 1, "Northwest": 2, "Northeast": 3}
+
+user_input = pd.DataFrame(
+    [[age, sex_val, bmi, children, smoker_val, region_map[region], charges]],
+    columns=["age", "sex", "bmi", "children", "smoker", "region", "charges"]
+)
+
+if st.sidebar.button("Predict Claim"):
+    prediction = model.predict(user_input)[0]
+    probability = model.predict_proba(user_input)[0][1]
+
+    if prediction == 1:
+        st.error(f"Claim Likely (Probability: {probability:.2f})")
+    else:
+        st.success(f"Claim Not Likely (Probability: {probability:.2f})")
+
+    st.subheader("SHAP Explanation")
+
+    explainer = shap.TreeExplainer(model)
+    shap_values = explainer.shap_values(user_input)
+
+    shap_vals_class1 = shap_values[1]
+
+    fig = plt.figure()
+    shap.waterfall_plot(
+        shap.Explanation(
+            values=shap_vals_class1[0],
+            base_values=explainer.expected_value[1],
+            data=user_input.iloc[0],
+            feature_names=user_input.columns,
+        ),
+        show=False
+    )
+    st.pyplot(fig)

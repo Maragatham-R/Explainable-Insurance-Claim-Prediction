@@ -1,8 +1,7 @@
 streamlit
 pandas
-numpy
-shap
-matplotlib
 scikit-learn
 joblib
-seaborn  
+shap==0.41.0
+numba==0.56.4
+numpy

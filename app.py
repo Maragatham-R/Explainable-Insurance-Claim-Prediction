@@ -21,6 +21,11 @@ st.title("🛡️ Explainable Insurance Claim Prediction")
 model = joblib.load("insurance.pkl")
 
 # --------------------------
+# GET FEATURE NAMES FROM MODEL (CRITICAL FIX)
+# --------------------------
+model_features = model.feature_names_in_
+
+# --------------------------
 # SESSION STATE
 # --------------------------
 if "predicted" not in st.session_state:
@@ -51,9 +56,10 @@ region_map = {
     "Northeast": 3,
 }
 
+# IMPORTANT: follow model feature order
 user_input = pd.DataFrame(
     [[age, sex_val, bmi, children, smoker_val, region_map[region], charges]],
-    columns=["age", "sex", "bmi", "children", "smoker", "region", "charges"],
+    columns=model_features
 )
 
 # --------------------------
@@ -66,7 +72,7 @@ if st.sidebar.button("🔍 Predict Claim"):
     st.session_state.probability = model.predict_proba(user_input)[0][1]
 
 # --------------------------
-# SHOW RESULTS
+# SHOW RESULT
 # --------------------------
 if st.session_state.predicted:
 
@@ -89,7 +95,7 @@ if st.session_state.predicted:
         explainer = shap.TreeExplainer(model)
         shap_values = explainer.shap_values(st.session_state.user_input)
 
-        # ---- SAFE SHAP EXTRACTION ----
+        # Binary classification handling
         if isinstance(shap_values, list):
             shap_vals = (
                 shap_values[1][0]
@@ -99,22 +105,23 @@ if st.session_state.predicted:
         else:
             shap_vals = shap_values[0]
 
-        # 🔥 FIX: force 1D
+        # Force 1D
         shap_vals = np.array(shap_vals).reshape(-1)
 
+        # FINAL SAFE DATAFRAME
         shap_df = pd.DataFrame({
-            "Feature": st.session_state.user_input.columns,
+            "Feature": model_features,
             "Impact": np.abs(shap_vals)
         }).sort_values(by="Impact", ascending=True)
 
         fig, ax = plt.subplots(figsize=(8, 5))
         ax.barh(shap_df["Feature"], shap_df["Impact"])
-        ax.set_xlabel("Feature Impact on Prediction")
+        ax.set_xlabel("Feature Impact")
         ax.set_title("SHAP Feature Contribution")
 
         st.pyplot(fig)
 
         st.info(
-            "SHAP values represent the magnitude of each feature's "
+            "SHAP bar chart visualizes the magnitude of each feature's "
             "contribution to the individual prediction."
         )

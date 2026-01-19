@@ -97,14 +97,30 @@ if st.button("🔍 Predict Claim"):
     # ---------------------------
     st.subheader("📊 Why this prediction was made")
 
-    shap_values = explainer.shap_values(user_input)
+    # Compute SHAP values
+shap_values = explainer.shap_values(user_input)
 
-    fig = shap.force_plot(
-         explainer.expected_value[1],
-         shap_values[1],
-         user_input,
-         matplotlib=True
-    )
+# Check if shap_values is a list (binary classification)
+if isinstance(shap_values, list):
+    # Class 1 = Claim
+    shap_values_claim = shap_values[1]
+    expected_value = explainer.expected_value[1]
+else:
+    # shap_values is a single array
+    shap_values_claim = shap_values
+    expected_value = explainer.expected_value
+
+# Create SHAP force plot
+fig = shap.force_plot(
+    expected_value,
+    shap_values_claim,
+    user_input,
+    matplotlib=True
+)
+
+# Display in Streamlit
+st.pyplot(fig, bbox_inches='tight')
+
     st.pyplot(fig, bbox_inches="tight")
 
     # ---------------------------

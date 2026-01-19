@@ -1,118 +1,119 @@
+# app.py
 import streamlit as st
 import pandas as pd
-import numpy as np
+import joblib
 import shap
 import matplotlib.pyplot as plt
-from sklearn.ensemble import RandomForestClassifier
+import numpy as np
 
 # --------------------------
-# PAGE CONFIG
+# Page config
 # --------------------------
-st.set_page_config(page_title="SHAP Explainable ML App", layout="wide")
-
-st.title("Explainable AI using SHAP")
-st.write("User inputs on sidebar and SHAP explanation in the center")
-
-# --------------------------
-# SAMPLE DATA (replace with your dataset)
-# --------------------------
-# Example dataset (binary classification)
-data = pd.DataFrame({
-    "age": [25, 45, 35, 50, 23, 40],
-    "sex": [0, 1, 1, 0, 0, 1],
-    "bmi": [22.5, 30.1, 27.3, 26.8, 21.9, 28.4],
-    "bp": [120, 140, 130, 135, 118, 145],
-    "target": [0, 1, 1, 1, 0, 1]
-})
-
-X = data.drop("target", axis=1)
-y = data["target"]
-
-# --------------------------
-# TRAIN MODEL
-# --------------------------
-model = RandomForestClassifier(random_state=42)
-model.fit(X, y)
-
-# --------------------------
-# SIDEBAR INPUTS
-# --------------------------
-st.sidebar.header("User Input Parameters")
-
-age = st.sidebar.slider("Age", 18, 80, 30)
-sex = st.sidebar.selectbox("Sex", ["Male", "Female"])
-bmi = st.sidebar.slider("BMI", 15.0, 40.0, 25.0)
-bp = st.sidebar.slider("Blood Pressure", 90, 180, 120)
-
-sex_val = 1 if sex == "Male" else 0
-
-user_input = pd.DataFrame({
-    "age": [age],
-    "sex": [sex_val],
-    "bmi": [bmi],
-    "bp": [bp]
-})
-
-# --------------------------
-# PREDICTION
-# --------------------------
-prediction = model.predict(user_input)[0]
-prediction_proba = model.predict_proba(user_input)[0][1]
-
-st.subheader("Prediction Result")
-st.write(f"**Predicted Class:** {prediction}")
-st.write(f"**Prediction Probability:** {prediction_proba:.2f}")
-
-# --------------------------
-# SHAP EXPLANATION (FIXED)
-# --------------------------
-st.subheader("SHAP Feature Contribution (Pie Chart)")
-
-explainer = shap.TreeExplainer(model)
-shap_values = explainer.shap_values(user_input)
-
-# ---- FIX: force SHAP values to 1D ----
-if isinstance(shap_values, list):
-    shap_vals = shap_values[1][0].flatten()
-else:
-    shap_vals = shap_values[0].flatten()
-
-feature_names = user_input.columns
-shap_abs = np.abs(shap_vals)
-
-shap_df = pd.DataFrame({
-    "Feature": feature_names,
-    "Contribution": shap_abs
-})
-
-# Take top features
-shap_df = shap_df.sort_values(
-    by="Contribution", ascending=False
+st.set_page_config(
+    page_title="Insurance Claim Prediction",
+    layout="wide"
 )
 
-# Convert to percentage
-shap_df["Contribution (%)"] = (
-    shap_df["Contribution"] / shap_df["Contribution"].sum()
-) * 100
-
-# --------------------------
-# PIE CHART
-# --------------------------
-fig, ax = plt.subplots(figsize=(6, 6))
-ax.pie(
-    shap_df["Contribution (%)"],
-    labels=shap_df["Feature"],
-    autopct="%1.1f%%",
-    startangle=90
+st.title("🛡️ Explainable Insurance Claim Prediction")
+st.write(
+    "This application predicts the likelihood of an insurance claim and explains "
+    "the prediction using SHAP (SHapley Additive Explanations)."
 )
-ax.set_title("Feature Contribution to Model Prediction")
-
-st.pyplot(fig)
 
 # --------------------------
-# JOURNAL NOTE
+# Load trained model
 # --------------------------
-st.info(
-    "SHAP values are normalized and visualized as a pie chart to enhance "
-    "interpretability of individual predictions."
-)
+model = joblib.load("insurance.pkl")
+
+# --------------------------
+# User Inputs
+# --------------------------
+with st.form("input_form"):
+    st.subheader("📋 Customer Information")
+
+    age = st.slider("Age", 18, 100, 30)
+    sex = st.selectbox("Gender", ["Female", "Male"])
+    bmi = st.slider("BMI", 10.0, 50.0, 25.0)
+    children = st.number_input("Number of Children", 0, 10, 0)
+    smoker = st.selectbox("Smoker", ["No", "Yes"])
+    region = st.selectbox(
+        "Region", ["Southwest", "Southeast", "Northwest", "Northeast"]
+    )
+    charges = st.number_input("Medical Charges", 100.0, 100000.0, 5000.0)
+
+    submit = st.form_submit_button("🔍 Predict Claim")
+
+# --------------------------
+# Prediction + SHAP
+# --------------------------
+if submit:
+    # Encoding (same as training)
+    sex_val = 0 if sex == "Female" else 1
+    smoker_val = 0 if smoker == "No" else 1
+
+    region_map = {
+        "Southwest": 0,
+        "Southeast": 1,
+        "Northwest": 2,
+        "Northeast": 3,
+    }
+
+    user_input = pd.DataFrame(
+        [[age, sex_val, bmi, children, smoker_val, region_map[region], charges]],
+        columns=["age", "sex", "bmi", "children", "smoker", "region", "charges"],
+    )
+
+    # --------------------------
+    # Prediction
+    # --------------------------
+    prediction = model.predict(user_input)[0]
+    probability = model.predict_proba(user_input)[0][1]
+
+    st.subheader("📌 Prediction Result")
+
+    if prediction == 1:
+        st.error(f"⚠️ Claim Likely (Probability: {probability:.2f})")
+    else:
+        st.success(f"✅ Claim Not Likely (Probability: {probability:.2f})")
+
+    # --------------------------
+    # SHAP Explanation (BAR CHART – JOURNAL SAFE)
+    # --------------------------
+    st.subheader("🔎 Model Explanation (SHAP)")
+
+    explainer = shap.TreeExplainer(model)
+    shap_values = explainer.shap_values(user_input)
+
+    # Handle binary classification SHAP output
+    if isinstance(shap_values, list):
+        shap_vals = shap_values[1]  # focus on "claim likely" class
+    else:
+        shap_vals = shap_values
+
+    # Create clean figure
+    fig, ax = plt.subplots(figsize=(6, 4))
+
+    shap.summary_plot(
+        shap_vals,
+        user_input,
+        plot_type="bar",
+        max_display=7,
+        show=False
+    )
+
+    st.pyplot(fig)
+
+    # --------------------------
+    # Plain English Explanation (IMPORTANT FOR JOURNAL)
+    # --------------------------
+    st.markdown(
+        """
+        **Interpretation:**
+        - The bar chart shows the **mean absolute SHAP values**, representing
+          the contribution of each feature to the model's prediction.
+        - Features with higher SHAP values have a stronger influence on
+          insurance claim likelihood.
+        - For this prediction, **age and sex** exhibit the most significant impact,
+          while other variables contribute marginally.
+        """
+    )

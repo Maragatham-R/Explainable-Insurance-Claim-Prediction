@@ -20,10 +20,7 @@ st.title("🛡️ Explainable Insurance Claim Prediction")
 # --------------------------
 model = joblib.load("insurance.pkl")
 
-# IMPORTANT: background data (from training)
-# Load the SAME training data used for model
-background = pd.read_csv("insurance.csv")
-X_background = background.drop("target", axis=1)
+
 
 # --------------------------
 # SIDEBAR INPUTS

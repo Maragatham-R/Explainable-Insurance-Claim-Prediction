@@ -121,12 +121,12 @@ fig = shap.force_plot(
 # Display in Streamlit
 st.pyplot(fig, bbox_inches='tight')
 
-st.pyplot(fig, bbox_inches="tight")
+
 
     # ---------------------------
     # Simple Explanation Text
     # ---------------------------
-    st.subheader("🧠 Explanation in Simple Terms")
+st.subheader("🧠 Explanation in Simple Terms")
 
     shap_df = pd.DataFrame({
         "Feature": user_input.columns,

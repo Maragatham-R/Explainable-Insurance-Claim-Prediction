@@ -41,9 +41,9 @@ if st.sidebar.button("Predict Claim"):
     probability = model.predict_proba(user_input)[0][1]
 
     if prediction == 1:
-        st.error(f"Claim Likely (Probability: {probability:.2f})")
+        st.error(f"Claim  (Probability: {probability:.2f})")
     else:
-        st.success(f"Claim Not Likely (Probability: {probability:.2f})")
+        st.success(f"Not claim(Probability: {probability:.2f})")
 
     st.subheader("SHAP Explanation")
 
@@ -105,4 +105,9 @@ if st.sidebar.button("Predict Claim"):
     - Bars to the **right (+)** increase risk
     - Bars to the **left (–)** decrease risk
     """)
+    st.info(
+        "Negative SHAP values reduce the insurer’s claim risk, while positive values increase it. "
+        "A low probability indicates the customer is unlikely to file an insurance claim."
+    )
+
 

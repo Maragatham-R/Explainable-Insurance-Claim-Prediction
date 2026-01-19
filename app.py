@@ -128,15 +128,15 @@ st.pyplot(fig, bbox_inches='tight')
     # ---------------------------
 st.subheader("🧠 Explanation in Simple Terms")
 
-    shap_df = pd.DataFrame({
+shap_df = pd.DataFrame({
         "Feature": user_input.columns,
         "Impact": shap_values[1][0]
     }).sort_values(by="Impact", ascending=False)
 
-    for _, row in shap_df.iterrows():
-        if row["Impact"] > 0:
+for _, row in shap_df.iterrows():
+    if row["Impact"] > 0:
             st.write(f"🔺 **{row['Feature']}** increased the chance of a claim")
-        else:
+    else:
             st.write(f"🔻 **{row['Feature']}** reduced the chance of a claim")
 
 # ---------------------------

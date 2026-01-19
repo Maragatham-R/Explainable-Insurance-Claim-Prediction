@@ -14,14 +14,11 @@ st.set_page_config(
 )
 
 st.title("🛡️ Explainable Insurance Claim Prediction")
-st.write("Prediction with SHAP-based explainability")
 
 # ------------------------------------------------
-# LOAD TRAINED MODEL
+# LOAD MODEL
 # ------------------------------------------------
 model = joblib.load("insurance.pkl")
-
-# IMPORTANT: training feature space
 model_features = model.feature_names_in_
 
 # ------------------------------------------------
@@ -40,23 +37,32 @@ region = st.sidebar.selectbox(
 charges = st.sidebar.number_input("Charges", 100.0, 100000.0, 5000.0)
 
 # ------------------------------------------------
-# CREATE FULL FEATURE VECTOR (NO MISMATCH)
+# BUILD INPUT VECTOR (MATCH TRAINING SPACE)
 # ------------------------------------------------
 user_input = pd.DataFrame(
     np.zeros((1, len(model_features))),
     columns=model_features
 )
 
-# Assign numeric features
-user_input["age"] = age
-user_input["bmi"] = bmi
-user_input["children"] = children
-user_input["charges"] = charges
+# Numeric features
+for col, val in {
+    "age": age,
+    "bmi": bmi,
+    "children": children,
+    "charges": charges
+}.items():
+    if col in user_input.columns:
+        user_input[col] = val
 
-# Assign encoded categorical features
-user_input[f"sex_{sex}"] = 1
-user_input[f"smoker_{smoker}"] = 1
-user_input[f"region_{region}"] = 1
+# Categorical features (ONLY IF COLUMN EXISTS)
+if f"sex_{sex}" in user_input.columns:
+    user_input[f"sex_{sex}"] = 1
+
+if f"smoker_{smoker}" in user_input.columns:
+    user_input[f"smoker_{smoker}"] = 1
+
+if f"region_{region}" in user_input.columns:
+    user_input[f"region_{region}"] = 1
 
 # ------------------------------------------------
 # PREDICTION
@@ -72,44 +78,35 @@ if st.sidebar.button("🔍 Predict Claim"):
         st.success(f"✅ Claim Not Likely (Probability: {probability:.2f})")
 
     # ------------------------------------------------
-    # SHAP EXPLANATION BUTTON
+    # SHAP EXPLANATION
     # ------------------------------------------------
     if st.button("📊 Show SHAP Explanation"):
 
-        st.subheader("🔎 SHAP Feature Importance")
+        st.subheader("🔎 SHAP Feature Contribution")
 
         explainer = shap.TreeExplainer(model)
         shap_values = explainer.shap_values(user_input)
 
-        # -------- SHAP SHAPE FIX (CRITICAL) --------
         if isinstance(shap_values, list):
-            shap_vals = shap_values[1][0]  # positive class
+            shap_vals = shap_values[1][0]
         else:
             shap_vals = shap_values[0]
 
         shap_vals = np.abs(shap_vals).flatten()
 
-        # GUARANTEED SAME LENGTH
         shap_df = pd.DataFrame({
             "Feature": model_features,
             "Impact": shap_vals
-        })
+        }).sort_values(by="Impact", ascending=True).tail(10)
 
-        shap_df = shap_df.sort_values(
-            by="Impact", ascending=True
-        ).tail(10)
-
-        # ------------------------------------------------
-        # BAR CHART
-        # ------------------------------------------------
         fig, ax = plt.subplots(figsize=(8, 5))
         ax.barh(shap_df["Feature"], shap_df["Impact"])
         ax.set_xlabel("Mean |SHAP Value|")
-        ax.set_title("Top Contributing Features")
+        ax.set_title("Top Feature Contributions")
 
         st.pyplot(fig)
 
         st.info(
-            "The bar chart shows how strongly each feature "
-            "contributed to the prediction."
+            "SHAP values represent the contribution of each feature "
+            "to the predicted insurance claim outcome."
         )

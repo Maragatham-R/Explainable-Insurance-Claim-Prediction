@@ -87,3 +87,22 @@ if st.sidebar.button("Predict Claim"):
     ax.set_title("Top Feature Contributions")
 
     st.pyplot(fig)
+    st.markdown("""
+    ### 🔍 How to Read This SHAP Chart
+
+    - **Positive SHAP value (+)**  
+      → The feature **increases the likelihood of an insurance claim**.  
+      → It pushes the prediction **towards “Claim Likely”**.
+
+    - **Negative SHAP value (–)**  
+      → The feature **reduces the likelihood of an insurance claim**.  
+      → It pushes the prediction **towards “Claim Not Likely”**.
+
+
+
+    ### 📊 Feature Interpretation Example
+    - Features with **longer bars** have **greater influence**
+    - Bars to the **right (+)** increase risk
+    - Bars to the **left (–)** decrease risk
+    """)
+

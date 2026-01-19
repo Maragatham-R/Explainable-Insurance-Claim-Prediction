@@ -8,7 +8,7 @@ import streamlit.components.v1 as components
 # --------------------------
 # Load pre-trained model
 # --------------------------
-model = joblib.load("rf_model.pkl")  # Make sure this file is in the same folder
+model = joblib.load("insurance.pkl")  # Make sure this file is in the same folder
 
 # --------------------------
 # Streamlit App UI

@@ -1,39 +1,35 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 import shap
 import matplotlib.pyplot as plt
 import joblib
+import numpy as np
 
-# --------------------------
+# -----------------------------
 # PAGE CONFIG
-# --------------------------
+# -----------------------------
 st.set_page_config(
     page_title="Explainable Insurance Claim Prediction",
     layout="wide"
 )
 
 st.title("🛡️ Explainable Insurance Claim Prediction")
+st.write("Prediction with user-friendly SHAP explanation")
 
-# --------------------------
-# LOAD MODEL
-# --------------------------
+# -----------------------------
+# LOAD PIPELINE MODEL
+# -----------------------------
 model = joblib.load("insurance.pkl")
-model_features = model.feature_names_in_
 
-# --------------------------
-# SESSION STATE INIT
-# --------------------------
-if "user_input" not in st.session_state:
-    st.session_state.user_input = None
-if "prediction" not in st.session_state:
-    st.session_state.prediction = None
-if "probability" not in st.session_state:
-    st.session_state.probability = None
+# -----------------------------
+# SESSION STATE
+# -----------------------------
+if "prediction_done" not in st.session_state:
+    st.session_state.prediction_done = False
 
-# --------------------------
-# SIDEBAR INPUTS
-# --------------------------
+# -----------------------------
+# SIDEBAR INPUTS (RAW FEATURES)
+# -----------------------------
 st.sidebar.header("User Inputs")
 
 age = st.sidebar.slider("Age", 18, 100, 30)
@@ -46,71 +42,70 @@ region = st.sidebar.selectbox(
 )
 charges = st.sidebar.number_input("Charges", 100.0, 100000.0, 5000.0)
 
-# --------------------------
-# BUILD FEATURE VECTOR (MATCH MODEL)
-# --------------------------
-user_input = pd.DataFrame(np.zeros((1, len(model_features))), columns=model_features)
+# -----------------------------
+# RAW INPUT DATAFRAME
+# -----------------------------
+raw_input = pd.DataFrame([{
+    "age": age,
+    "sex": sex,
+    "bmi": bmi,
+    "children": children,
+    "smoker": smoker,
+    "region": region,
+    "charges": charges
+}])
 
-# Numeric features
-for col, val in {"age": age, "bmi": bmi, "children": children, "charges": charges}.items():
-    if col in user_input.columns:
-        user_input[col] = val
-
-# Categorical features (only if exist)
-if f"sex_{sex}" in user_input.columns:
-    user_input[f"sex_{sex}"] = 1
-if f"smoker_{smoker}" in user_input.columns:
-    user_input[f"smoker_{smoker}"] = 1
-if f"region_{region}" in user_input.columns:
-    user_input[f"region_{region}"] = 1
-
-# --------------------------
+# -----------------------------
 # PREDICTION BUTTON
-# --------------------------
+# -----------------------------
 if st.sidebar.button("🔍 Predict Claim"):
-    st.session_state.user_input = user_input
-    st.session_state.prediction = model.predict(user_input)[0]
-    st.session_state.probability = model.predict_proba(user_input)[0][1]
+    st.session_state.prediction_done = True
+    st.session_state.raw_input = raw_input
 
-# --------------------------
-# SHOW PREDICTION
-# --------------------------
-if st.session_state.user_input is not None:
-    if st.session_state.prediction == 1:
-        st.error(f"⚠️ Claim Likely (Probability: {st.session_state.probability:.2f})")
+    pred = model.predict(raw_input)[0]
+    prob = model.predict_proba(raw_input)[0][1]
+
+    st.session_state.pred = pred
+    st.session_state.prob = prob
+
+# -----------------------------
+# SHOW RESULT
+# -----------------------------
+if st.session_state.prediction_done:
+
+    if st.session_state.pred == 1:
+        st.error(f"⚠️ Claim Likely (Probability: {st.session_state.prob:.2f})")
     else:
-        st.success(f"✅ Claim Not Likely (Probability: {st.session_state.probability:.2f})")
+        st.success(f"✅ Claim Not Likely (Probability: {st.session_state.prob:.2f})")
 
-    # --------------------------
-    # SHOW SHAP BUTTON
-    # --------------------------
+    # -----------------------------
+    # SHAP EXPLANATION
+    # -----------------------------
     if st.button("📊 Show SHAP Explanation"):
 
-        st.subheader("🔎 SHAP Feature Contribution")
+        st.subheader("🔎 SHAP Explanation (Top Factors)")
 
-        explainer = shap.TreeExplainer(model)
-        shap_values = explainer.shap_values(st.session_state.user_input)
+        # SHAP explainer (PIPELINE SAFE)
+        explainer = shap.Explainer(model)
+        shap_values = explainer(st.session_state.raw_input)
 
-        if isinstance(shap_values, list):
-            shap_vals = shap_values[1][0] if st.session_state.prediction == 1 else shap_values[0][0]
-        else:
-            shap_vals = shap_values[0]
+        # Extract values safely
+        values = np.abs(shap_values.values[0])
+        features = shap_values.feature_names
 
-        shap_vals = np.abs(shap_vals).flatten()
+        shap_df = pd.DataFrame({
+            "Feature": features,
+            "Impact": values
+        }).sort_values(by="Impact", ascending=True).tail(10)
 
-        # Build DataFrame
-        shap_df = pd.DataFrame({"Feature": model_features, "Impact": shap_vals})
-        shap_df = shap_df.sort_values(by="Impact", ascending=True).tail(10)
-
-        # Bar plot
         fig, ax = plt.subplots(figsize=(8, 5))
         ax.barh(shap_df["Feature"], shap_df["Impact"])
-        ax.set_xlabel("Mean |SHAP Value|")
-        ax.set_title("Top Feature Contributions")
+        ax.set_xlabel("Impact on Prediction")
+        ax.set_title("Top Contributing Features")
 
         st.pyplot(fig)
 
         st.info(
-            "The bar chart shows the magnitude of each feature's contribution "
-            "to the prediction."
+            "This chart shows how each feature influenced the prediction. "
+            "Higher bars indicate stronger impact."
         )

@@ -4,7 +4,6 @@ import pandas as pd
 import joblib
 import shap
 import matplotlib.pyplot as plt
-import numpy as np
 
 # --------------------------
 # Page config
@@ -14,39 +13,41 @@ st.set_page_config(
     layout="wide"
 )
 
+# --------------------------
+# Title
+# --------------------------
 st.title("🛡️ Explainable Insurance Claim Prediction")
 st.write(
-    "This application predicts the likelihood of an insurance claim and explains "
-    "the prediction using SHAP (SHapley Additive Explanations)."
+    "Predict the likelihood of an insurance claim and understand the decision "
+    "using SHAP-based explainability."
 )
 
 # --------------------------
-# Load trained model
+# Load model
 # --------------------------
 model = joblib.load("insurance.pkl")
 
 # --------------------------
-# User Inputs
+# Sidebar – User Inputs
 # --------------------------
-with st.form("input_form"):
-    st.subheader("📋 Customer Information")
+st.sidebar.header("📋 Customer Details")
 
-    age = st.slider("Age", 18, 100, 30)
-    sex = st.selectbox("Gender", ["Female", "Male"])
-    bmi = st.slider("BMI", 10.0, 50.0, 25.0)
-    children = st.number_input("Number of Children", 0, 10, 0)
-    smoker = st.selectbox("Smoker", ["No", "Yes"])
-    region = st.selectbox(
-        "Region", ["Southwest", "Southeast", "Northwest", "Northeast"]
-    )
-    charges = st.number_input("Medical Charges", 100.0, 100000.0, 5000.0)
+age = st.sidebar.slider("Age", 18, 100, 30)
+sex = st.sidebar.selectbox("Gender", ["Female", "Male"])
+bmi = st.sidebar.slider("BMI", 10.0, 50.0, 25.0)
+children = st.sidebar.number_input("Number of Children", 0, 10, 0)
+smoker = st.sidebar.selectbox("Smoker", ["No", "Yes"])
+region = st.sidebar.selectbox(
+    "Region", ["Southwest", "Southeast", "Northwest", "Northeast"]
+)
+charges = st.sidebar.number_input("Medical Charges", 100.0, 100000.0, 5000.0)
 
-    submit = st.form_submit_button("🔍 Predict Claim")
+predict_btn = st.sidebar.button("🔍 Predict Claim")
 
 # --------------------------
-# Prediction + SHAP
+# Main Panel – Prediction & SHAP
 # --------------------------
-if submit:
+if predict_btn:
     # Encoding (same as training)
     sex_val = 0 if sex == "Female" else 1
     smoker_val = 0 if smoker == "No" else 1
@@ -77,22 +78,23 @@ if submit:
         st.success(f"✅ Claim Not Likely (Probability: {probability:.2f})")
 
     # --------------------------
-    # SHAP Explanation (BAR CHART – JOURNAL SAFE)
+    # SHAP Explanation (FIXED & VISIBLE)
     # --------------------------
     st.subheader("🔎 Model Explanation (SHAP)")
 
     explainer = shap.TreeExplainer(model)
     shap_values = explainer.shap_values(user_input)
 
-    # Handle binary classification SHAP output
+    # For binary classification → focus on positive class
     if isinstance(shap_values, list):
-        shap_vals = shap_values[1]  # focus on "claim likely" class
+        shap_vals = shap_values[1]
     else:
         shap_vals = shap_values
 
-    # Create clean figure
-    fig, ax = plt.subplots(figsize=(6, 4))
+    # IMPORTANT: Clear previous plots
+    plt.clf()
 
+    # SHAP bar plot (journal-safe)
     shap.summary_plot(
         shap_vals,
         user_input,
@@ -101,19 +103,17 @@ if submit:
         show=False
     )
 
-    st.pyplot(fig)
+    # Display the SHAP figure
+    st.pyplot(plt.gcf())
 
     # --------------------------
-    # Plain English Explanation (IMPORTANT FOR JOURNAL)
+    # Plain-English Explanation
     # --------------------------
     st.markdown(
         """
-        **Interpretation:**
-        - The bar chart shows the **mean absolute SHAP values**, representing
-          the contribution of each feature to the model's prediction.
-        - Features with higher SHAP values have a stronger influence on
-          insurance claim likelihood.
-        - For this prediction, **age and sex** exhibit the most significant impact,
-          while other variables contribute marginally.
+        **How to read this chart:**
+        - The bar chart represents **mean absolute SHAP values**
+        - Higher values indicate stronger influence on the prediction
+        - For this case, **age and sex** contribute most to the claim decision
         """
     )

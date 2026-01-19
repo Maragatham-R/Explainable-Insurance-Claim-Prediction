@@ -14,18 +14,17 @@ st.set_page_config(
 )
 
 st.title("🛡️ Explainable Insurance Claim Prediction")
+st.write("Prediction with SHAP-based feature contribution")
 
 # --------------------------
-# LOAD MODEL & BACKGROUND DATA
+# LOAD MODEL
 # --------------------------
 model = joblib.load("insurance.pkl")
-
-
 
 # --------------------------
 # SIDEBAR INPUTS
 # --------------------------
-st.sidebar.header("User Inputs")
+st.sidebar.header("User Input Parameters")
 
 age = st.sidebar.slider("Age", 18, 100, 30)
 sex = st.sidebar.selectbox("Gender", ["Female", "Male"])
@@ -53,45 +52,52 @@ user_input = pd.DataFrame(
 )
 
 # --------------------------
-# PREDICTION
+# PREDICTION BUTTON
 # --------------------------
-prediction = model.predict(user_input)[0]
-probability = model.predict_proba(user_input)[0][1]
+if st.sidebar.button("🔍 Predict Claim"):
 
-if prediction == 1:
-    st.error(f"⚠️ Claim Likely (Probability: {probability:.2f})")
-else:
-    st.success(f"✅ Claim Not Likely (Probability: {probability:.2f})")
+    prediction = model.predict(user_input)[0]
+    probability = model.predict_proba(user_input)[0][1]
 
-# --------------------------
-# SHAP BAR PLOT (CORRECT WAY)
-# --------------------------
-st.subheader("🔎 Model Explanation (SHAP Bar Plot)")
+    if prediction == 1:
+        st.error(f"⚠️ Claim Likely (Probability: {probability:.2f})")
+    else:
+        st.success(f"✅ Claim Not Likely (Probability: {probability:.2f})")
 
-# Create explainer with background data
-explainer = shap.TreeExplainer(model)
+    # --------------------------
+    # SHAP EXPLANATION BUTTON
+    # --------------------------
+    if st.button("📊 Show SHAP Explanation"):
 
-# Compute SHAP values
-shap_values = explainer.shap_values(user_input)
+        st.subheader("🔎 Model Explanation (SHAP Bar Chart)")
 
-# Select correct class
-if isinstance(shap_values, list):
-    shap_vals = shap_values[1][0] if prediction == 1 else shap_values[0][0]
-else:
-    shap_vals = shap_values[0]
+        # SHAP explainer (NO background mentioned)
+        explainer = shap.TreeExplainer(model)
+        shap_values = explainer.shap_values(user_input)
 
-# Convert to DataFrame (FIXES EMPTY PLOT)
-shap_df = pd.DataFrame({
-    "Feature": user_input.columns,
-    "SHAP Value": np.abs(shap_vals)
-}).sort_values(by="SHAP Value", ascending=True)
+        # Handle binary classification
+        if isinstance(shap_values, list):
+            shap_vals = shap_values[1][0] if prediction == 1 else shap_values[0][0]
+        else:
+            shap_vals = shap_values[0]
 
-# --------------------------
-# MANUAL BAR PLOT (MOST STABLE)
-# --------------------------
-fig, ax = plt.subplots(figsize=(8, 5))
-ax.barh(shap_df["Feature"], shap_df["SHAP Value"])
-ax.set_xlabel("Impact on Model Output")
-ax.set_title("Feature Importance for Current Prediction")
+        # Convert to DataFrame (1D FIX)
+        shap_df = pd.DataFrame({
+            "Feature": user_input.columns,
+            "Impact": np.abs(shap_vals)
+        }).sort_values(by="Impact", ascending=True)
 
-st.pyplot(fig)
+        # --------------------------
+        # BAR PLOT (STREAMLIT SAFE)
+        # --------------------------
+        fig, ax = plt.subplots(figsize=(8, 5))
+        ax.barh(shap_df["Feature"], shap_df["Impact"])
+        ax.set_xlabel("Feature Impact on Prediction")
+        ax.set_title("SHAP Feature Contribution")
+
+        st.pyplot(fig)
+
+        st.info(
+            "The bar chart shows the magnitude of each feature's contribution "
+            "to the individual prediction using SHAP values."
+        )

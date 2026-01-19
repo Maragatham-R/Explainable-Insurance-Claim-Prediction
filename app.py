@@ -14,7 +14,6 @@ st.set_page_config(
 )
 
 st.title("🛡️ Explainable Insurance Claim Prediction")
-st.write("Prediction with SHAP-based feature contribution")
 
 # --------------------------
 # LOAD MODEL
@@ -22,7 +21,7 @@ st.write("Prediction with SHAP-based feature contribution")
 model = joblib.load("insurance.pkl")
 
 # --------------------------
-# SESSION STATE INIT
+# SESSION STATE
 # --------------------------
 if "predicted" not in st.session_state:
     st.session_state.predicted = False
@@ -62,13 +61,12 @@ user_input = pd.DataFrame(
 # --------------------------
 if st.sidebar.button("🔍 Predict Claim"):
     st.session_state.predicted = True
-
+    st.session_state.user_input = user_input
     st.session_state.prediction = model.predict(user_input)[0]
     st.session_state.probability = model.predict_proba(user_input)[0][1]
-    st.session_state.user_input = user_input
 
 # --------------------------
-# SHOW PREDICTION
+# SHOW RESULTS
 # --------------------------
 if st.session_state.predicted:
 
@@ -82,7 +80,7 @@ if st.session_state.predicted:
         )
 
     # --------------------------
-    # SHAP BUTTON (NOW WORKS)
+    # SHAP BUTTON
     # --------------------------
     if st.button("📊 Show SHAP Explanation"):
 
@@ -91,6 +89,7 @@ if st.session_state.predicted:
         explainer = shap.TreeExplainer(model)
         shap_values = explainer.shap_values(st.session_state.user_input)
 
+        # ---- SAFE SHAP EXTRACTION ----
         if isinstance(shap_values, list):
             shap_vals = (
                 shap_values[1][0]
@@ -99,6 +98,9 @@ if st.session_state.predicted:
             )
         else:
             shap_vals = shap_values[0]
+
+        # 🔥 FIX: force 1D
+        shap_vals = np.array(shap_vals).reshape(-1)
 
         shap_df = pd.DataFrame({
             "Feature": st.session_state.user_input.columns,
@@ -113,6 +115,6 @@ if st.session_state.predicted:
         st.pyplot(fig)
 
         st.info(
-            "The bar chart illustrates the relative contribution of each "
-            "input feature to the model’s prediction using SHAP values."
+            "SHAP values represent the magnitude of each feature's "
+            "contribution to the individual prediction."
         )

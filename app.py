@@ -1,136 +1,118 @@
-# app.py
 import streamlit as st
 import pandas as pd
-import joblib
+import numpy as np
 import shap
 import matplotlib.pyplot as plt
-import numpy as np
+from sklearn.ensemble import RandomForestClassifier
 
 # --------------------------
-# Page config
+# PAGE CONFIG
 # --------------------------
-st.set_page_config(
-    page_title="Insurance Claim Prediction",
-    layout="wide"
+st.set_page_config(page_title="SHAP Explainable ML App", layout="wide")
+
+st.title("Explainable AI using SHAP")
+st.write("User inputs on sidebar and SHAP explanation in the center")
+
+# --------------------------
+# SAMPLE DATA (replace with your dataset)
+# --------------------------
+# Example dataset (binary classification)
+data = pd.DataFrame({
+    "age": [25, 45, 35, 50, 23, 40],
+    "sex": [0, 1, 1, 0, 0, 1],
+    "bmi": [22.5, 30.1, 27.3, 26.8, 21.9, 28.4],
+    "bp": [120, 140, 130, 135, 118, 145],
+    "target": [0, 1, 1, 1, 0, 1]
+})
+
+X = data.drop("target", axis=1)
+y = data["target"]
+
+# --------------------------
+# TRAIN MODEL
+# --------------------------
+model = RandomForestClassifier(random_state=42)
+model.fit(X, y)
+
+# --------------------------
+# SIDEBAR INPUTS
+# --------------------------
+st.sidebar.header("User Input Parameters")
+
+age = st.sidebar.slider("Age", 18, 80, 30)
+sex = st.sidebar.selectbox("Sex", ["Male", "Female"])
+bmi = st.sidebar.slider("BMI", 15.0, 40.0, 25.0)
+bp = st.sidebar.slider("Blood Pressure", 90, 180, 120)
+
+sex_val = 1 if sex == "Male" else 0
+
+user_input = pd.DataFrame({
+    "age": [age],
+    "sex": [sex_val],
+    "bmi": [bmi],
+    "bp": [bp]
+})
+
+# --------------------------
+# PREDICTION
+# --------------------------
+prediction = model.predict(user_input)[0]
+prediction_proba = model.predict_proba(user_input)[0][1]
+
+st.subheader("Prediction Result")
+st.write(f"**Predicted Class:** {prediction}")
+st.write(f"**Prediction Probability:** {prediction_proba:.2f}")
+
+# --------------------------
+# SHAP EXPLANATION (FIXED)
+# --------------------------
+st.subheader("SHAP Feature Contribution (Pie Chart)")
+
+explainer = shap.TreeExplainer(model)
+shap_values = explainer.shap_values(user_input)
+
+# ---- FIX: force SHAP values to 1D ----
+if isinstance(shap_values, list):
+    shap_vals = shap_values[1][0].flatten()
+else:
+    shap_vals = shap_values[0].flatten()
+
+feature_names = user_input.columns
+shap_abs = np.abs(shap_vals)
+
+shap_df = pd.DataFrame({
+    "Feature": feature_names,
+    "Contribution": shap_abs
+})
+
+# Take top features
+shap_df = shap_df.sort_values(
+    by="Contribution", ascending=False
 )
 
-st.title("🛡️ Explainable Insurance Claim Prediction")
-st.write(
-    "This application predicts insurance claim likelihood and explains "
-    "the prediction using SHAP-based feature contributions."
+# Convert to percentage
+shap_df["Contribution (%)"] = (
+    shap_df["Contribution"] / shap_df["Contribution"].sum()
+) * 100
+
+# --------------------------
+# PIE CHART
+# --------------------------
+fig, ax = plt.subplots(figsize=(6, 6))
+ax.pie(
+    shap_df["Contribution (%)"],
+    labels=shap_df["Feature"],
+    autopct="%1.1f%%",
+    startangle=90
 )
+ax.set_title("Feature Contribution to Model Prediction")
+
+st.pyplot(fig)
 
 # --------------------------
-# Load model
+# JOURNAL NOTE
 # --------------------------
-model = joblib.load("insurance.pkl")
-
-# --------------------------
-# Sidebar – User Inputs
-# --------------------------
-st.sidebar.header("📋 Customer Details")
-
-age = st.sidebar.slider("Age", 18, 100, 30)
-sex = st.sidebar.selectbox("Gender", ["Female", "Male"])
-bmi = st.sidebar.slider("BMI", 10.0, 50.0, 25.0)
-children = st.sidebar.number_input("Number of Children", 0, 10, 0)
-smoker = st.sidebar.selectbox("Smoker", ["No", "Yes"])
-region = st.sidebar.selectbox(
-    "Region", ["Southwest", "Southeast", "Northwest", "Northeast"]
+st.info(
+    "SHAP values are normalized and visualized as a pie chart to enhance "
+    "interpretability of individual predictions."
 )
-charges = st.sidebar.number_input("Medical Charges", 100.0, 100000.0, 5000.0)
-
-predict_btn = st.sidebar.button("🔍 Predict Claim")
-
-# --------------------------
-# Main Panel – Prediction & Explanation
-# --------------------------
-if predict_btn:
-    # Encoding (same as training)
-    sex_val = 0 if sex == "Female" else 1
-    smoker_val = 0 if smoker == "No" else 1
-
-    region_map = {
-        "Southwest": 0,
-        "Southeast": 1,
-        "Northwest": 2,
-        "Northeast": 3,
-    }
-
-    user_input = pd.DataFrame(
-        [[age, sex_val, bmi, children, smoker_val, region_map[region], charges]],
-        columns=["age", "sex", "bmi", "children", "smoker", "region", "charges"],
-    )
-
-    # --------------------------
-    # Prediction
-    # --------------------------
-    prediction = model.predict(user_input)[0]
-    probability = model.predict_proba(user_input)[0][1]
-
-    st.subheader("📌 Prediction Result")
-
-    if prediction == 1:
-        st.error(f"⚠️ Claim Likely (Probability: {probability:.2f})")
-    else:
-        st.success(f"✅ Claim Not Likely (Probability: {probability:.2f})")
-
-    # --------------------------
-    # SHAP Explanation → PIE CHART
-    # --------------------------
-    st.subheader("🔎 Explanation of Prediction")
-
-    explainer = shap.TreeExplainer(model)
-    shap_values = explainer.shap_values(user_input)
-
-    # Binary classification → use positive class
-    if isinstance(shap_values, list):
-        shap_vals = shap_values[1][0]
-    else:
-        shap_vals = shap_values[0]
-
-    # Convert SHAP values to absolute contributions
-    feature_names = user_input.columns
-    shap_abs = np.abs(shap_vals)
-
-    shap_df = pd.DataFrame({
-        "Feature": feature_names,
-        "Contribution": shap_abs
-    })
-
-    # Take top features only
-    shap_df = shap_df.sort_values(
-        by="Contribution", ascending=False
-    ).head(5)
-
-    # Normalize to percentages
-    shap_df["Contribution (%)"] = (
-        shap_df["Contribution"] / shap_df["Contribution"].sum()
-    ) * 100
-
-    # --------------------------
-    # Pie Chart
-    # --------------------------
-    fig, ax = plt.subplots(figsize=(6, 6))
-    ax.pie(
-        shap_df["Contribution (%)"],
-        labels=shap_df["Feature"],
-        autopct="%1.1f%%",
-        startangle=90
-    )
-    ax.set_title("Feature Contribution to Prediction")
-
-    st.pyplot(fig)
-
-    # --------------------------
-    # Simple Explanation Text
-    # --------------------------
-    st.markdown(
-        """
-        **How to interpret this chart:**
-        - The pie chart shows the **relative contribution** of each feature
-          to the model’s decision.
-        - Larger slices indicate stronger influence on the insurance claim prediction.
-        - This visualization is derived from **SHAP values**, ensuring faithful explainability.
-        """
-    )

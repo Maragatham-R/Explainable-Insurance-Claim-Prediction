@@ -50,28 +50,30 @@ if st.sidebar.button("Predict Claim"):
     explainer = shap.TreeExplainer(model)
     shap_values = explainer.shap_values(user_input)
 
-    # ---- FIX SHAPE PROPERLY ----
+    # ---- Handle classifier output ----
     if isinstance(shap_values, list):
-        # Binary classifier → take class 1 and first row
-        shap_vals = shap_values[1][0]
+        shap_vals = shap_values[1][0]   # class 1, first row
     else:
-        # Single-output model → take first row
         shap_vals = shap_values[0]
 
-    # ---- ENSURE 1D ARRAY ----
     shap_vals = shap_vals.flatten()
 
-    # ---- SORT FOR BETTER VISUAL ----
-    feature_names = user_input.columns
+    # ---- USE MODEL FEATURE NAMES (NOT user_input.columns) ----
+    feature_names = model.feature_names_in_
+
+    # ---- SAFETY CHECK ----
+    assert len(feature_names) == len(shap_vals)
+
+# ---- SORT ----
     sorted_idx = np.argsort(np.abs(shap_vals))
 
-    fig, ax = plt.subplots(figsize=(8, 5))
+    fig, ax = plt.subplots(figsize=(9, 6))
     ax.barh(
-        feature_names[sorted_idx],
+        np.array(feature_names)[sorted_idx],
         shap_vals[sorted_idx]
     )
+
     ax.set_xlabel("SHAP value (impact on prediction)")
     ax.set_title("Feature Impact on Insurance Claim Prediction")
 
     st.pyplot(fig)
-

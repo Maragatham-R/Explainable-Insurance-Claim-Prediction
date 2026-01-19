@@ -49,17 +49,16 @@ if st.sidebar.button("Predict Claim"):
     explainer = shap.TreeExplainer(model)
     shap_values = explainer.shap_values(user_input)
 
-    # Handle binary vs single-output models
+    # --- HANDLE SHAP OUTPUT SAFELY ---
     if isinstance(shap_values, list):
-        shap_vals = shap_values[1]
+        shap_vals = shap_values[1][0]   # <-- IMPORTANT: [0]
     else:
-        shap_vals = shap_values
+        shap_vals = shap_values[0]      # <-- IMPORTANT: [0]
 
-    fig = plt.figure()
-    shap.summary_plot(
-        shap_vals,
-        user_input,
-        plot_type="bar",
-        show=False
-    )
+    # --- CREATE BAR PLOT ---
+    fig, ax = plt.subplots(figsize=(8, 5))
+    ax.barh(user_input.columns, shap_vals)
+    ax.set_xlabel("SHAP value (impact on model output)")
+    ax.set_title("Feature Impact on Prediction")
+
     st.pyplot(fig)
